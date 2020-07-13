@@ -44,25 +44,27 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("secret", req.NamespacedName)
 
 	// your logic here
-	var secrets corev1.Secret
-	if err := r.Get(ctx, req.NamespacedName, &secrets); err != nil {
-		log.Error(err, "unable to get secrets", "secrets:", secrets)
+	var secret corev1.Secret
+	if err := r.Get(ctx, req.NamespacedName, &secret); err != nil {
+		log.Error(err, "unable to get secrets", "secrets:", secret)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if _, err := r.compareTime(secrets); err != nil {
+	if _, err := r.compareTime(secret); err != nil {
 		log.Error(err, "unable to compare creation timestamp time for secrets")
-		return ctrl.Result{}, err
-	} else if err == nil {
-		secretExp, _ := r.compareTime(secrets)
-		oldSecret := secretExp.Data
-		if _, err := r.secretGenerator(oldSecret); err != nil {
-			log.Error(err, "unable to generate new secret")
-		}
 		return ctrl.Result{}, err
 	}
 
-	//move patching to the function below to avoid issues in the reconcile logic
+	if _, err := r.secretGenerator(8); err != nil {
+		log.Error(err, "unable to generate new secret")
+		return ctrl.Result{}, err
+	}
+
+	// if err := patchSecret(secret, newSecret); err != nil {
+	//log.Error(err, "unable to patch secret with new value", "new_value", newSecret)
+	//}
+
+	//move patching to the function below to avoid issues
 	//if err := r.Patch(ctx, secrets.DeepCopyObject(), client.RawPatch(types.JSONPatchType, newSecret), &client.PatchOptions{}) {
 	//	log.Info("reconiling and updating secret object with new secret value")
 	//}
@@ -71,6 +73,8 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 }
 
+// compareTime is a function that evaluates whether a secret is more than 7 days old
+// in such cases the secret that is more than 7 days old is returned to be used with secretGenerator
 func (r *SecretReconciler) compareTime(secrets corev1.Secret) (secret corev1.Secret, err error) {
 	secretTime := secret.CreationTimestamp.Time
 	targetTime := time.Now().AddDate(0, 0, -7)
@@ -82,12 +86,18 @@ func (r *SecretReconciler) compareTime(secrets corev1.Secret) (secret corev1.Sec
 	return secret, err
 }
 
-func (r *SecretReconciler) secretGenerator(oldSecret map[string][]byte) (newSecret map[string][]byte, err error) {
+// secretGenerator is a function that will eventually take an int (which is the length of the secret to be generated)
+// This will then be used within patchSecret
+func (r *SecretReconciler) secretGenerator(length int) (newSecret map[string][]byte, err error) {
+	newSecret = make(map[string][]byte, 1)
 
+	return newSecret, err
 }
 
-func (r *SecretReconciler) patchSecret(newSecret map[string][]byte) error {
+func (r *SecretReconciler) patchSecret(secret, newSecret map[string][]byte) error {
 
+	var err error
+	return err
 }
 
 // SetupWithManager registers the controller with that manager so that it starts when the manager starts
