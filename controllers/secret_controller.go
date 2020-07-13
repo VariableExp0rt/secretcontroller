@@ -44,33 +44,50 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("secret", req.NamespacedName)
 
 	// your logic here
-	var secrets corev1.SecretList
+	var secrets corev1.Secret
 	if err := r.Get(ctx, req.NamespacedName, &secrets); err != nil {
 		log.Error(err, "unable to get secrets", "secrets:", secrets)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if secret, err := r.compareTime(secrets); err != nil {
-		log.Error(err, "unable to compare creation timestamp time for secrets", "secret", secret)
+	if _, err := r.compareTime(secrets); err != nil {
+		log.Error(err, "unable to compare creation timestamp time for secrets")
+		return ctrl.Result{}, err
+	} else if err == nil {
+		secretExp, _ := r.compareTime(secrets)
+		oldSecret := secretExp.Data
+		if _, err := r.secretGenerator(oldSecret); err != nil {
+			log.Error(err, "unable to generate new secret")
+		}
+		return ctrl.Result{}, err
 	}
+
+	//move patching to the function below to avoid issues in the reconcile logic
+	//if err := r.Patch(ctx, secrets.DeepCopyObject(), client.RawPatch(types.JSONPatchType, newSecret), &client.PatchOptions{}) {
+	//	log.Info("reconiling and updating secret object with new secret value")
+	//}
 
 	return ctrl.Result{}, nil
 
 }
 
-func (r *SecretReconciler) compareTime(secrets corev1.SecretList) (secret corev1.Secret, err error) {
+func (r *SecretReconciler) compareTime(secrets corev1.Secret) (secret corev1.Secret, err error) {
+	secretTime := secret.CreationTimestamp.Time
+	targetTime := time.Now().AddDate(0, 0, -7)
 
-	for _, secret := range secrets.Items {
-
-		secretTime := secret.CreationTimestamp.Time
-		targetTime := time.Now().AddDate(0, 0, -7)
-
-		isValid := secretTime.Before(targetTime)
-		if isValid == false {
-			fmt.Printf("secret: %v is older than 7 days (%v), forbidden for this applciation", secret, secretTime)
-		}
+	isNotValid := secretTime.Before(targetTime)
+	if isNotValid == true {
+		fmt.Printf("secret: %v is older than 7 days (%v), forbidden for this applciation", secret, secretTime)
 	}
 	return secret, err
+}
+
+func (r *SecretReconciler) secretGenerator(oldSecret map[string][]byte) (newSecret map[string][]byte, err error) {
+
+}
+
+func (r *SecretReconciler) patchSecret(newSecret map[string][]byte) error {
+
 }
 
 // SetupWithManager registers the controller with that manager so that it starts when the manager starts
