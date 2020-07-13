@@ -55,7 +55,7 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, err
 	}
 
-	if _, err := r.secretGenerator(8); err != nil {
+	if _, err := r.secretGenerator(10); err != nil {
 		log.Error(err, "unable to generate new secret")
 		return ctrl.Result{}, err
 	}
@@ -82,6 +82,8 @@ func (r *SecretReconciler) compareTime(secrets corev1.Secret) (secret corev1.Sec
 	isNotValid := secretTime.Before(targetTime)
 	if isNotValid == true {
 		fmt.Printf("secret: %v is older than 7 days (%v), forbidden for this applciation", secret, secretTime)
+		// return secret if condition is met
+		return secret, err
 	}
 	return secret, err
 }
@@ -89,12 +91,11 @@ func (r *SecretReconciler) compareTime(secrets corev1.Secret) (secret corev1.Sec
 // secretGenerator is a function that will eventually take an int (which is the length of the secret to be generated)
 // This will then be used within patchSecret
 func (r *SecretReconciler) secretGenerator(length int) (newSecret map[string][]byte, err error) {
-	newSecret = make(map[string][]byte, 1)
 
 	return newSecret, err
 }
 
-func (r *SecretReconciler) patchSecret(secret, newSecret map[string][]byte) error {
+func (r *SecretReconciler) patchSecret(secret corev1.Secret, newSecret map[string][]byte) error {
 
 	var err error
 	return err
