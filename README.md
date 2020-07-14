@@ -1,1 +1,10 @@
-# A new Secret Controller
+# A new Secret Controller (WIP)
+
+Currently working on building a small example controller to manage different kinds of secrets. Using Kubebuilder which implements controller-runtime, I have built out some of the functions needed to manage secrets. I am hoping to add the following functionality;
+
+- Get the types of secret and for each, set the deadline for expiry and then rotate as necessary
+- For generic, at functionality to patch the current secret with a newly generated secret, preserving the "key" it is referenced by
+- For TLS secrets, when certificates expire create new certs and manage them accordingly
+- For docker-registry secrets, much the same as point 2.
+
+I'm working on this as and when I have some free time, but I aim to keep adding new features as I am learning Go!
