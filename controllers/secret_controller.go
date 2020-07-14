@@ -45,7 +45,12 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues("secret", req.NamespacedName)
 
+	//TODO: a check is needed here for the type of secret being reconciled
+
 	// your logic here
+	//TODO
+	//A switch statement is needed here to account the different secret types, which will determine
+	//which functions are executed by 'case' ("generic", "tls", "docker-registry").
 	var secret corev1.Secret
 	if err := r.Get(ctx, req.NamespacedName, &secret); err != nil {
 		log.Error(err, "unable to get secrets", "secret", secret)
@@ -121,12 +126,16 @@ func (r *SecretReconciler) generateRandomBytes(n int) (map[string][]byte, error)
 		return nil, err
 	}
 
-	//logic to map []byte to map[string][]byte
+	//TODO
+	//logic to map []byte to map[string][]byte, but need to find a way of merging the patch such
+	//that it retains the value of the 'key'. "secret" is obviously not the original value
 	value := make(map[string][]byte, 1)
-	value["secret"] = b
+	value[""] = b
 
 	return value, err
 }
+
+//Functions needed to handle other secret types, other than generic as above.
 
 // SetupWithManager registers the controller with that manager so that it starts when the manager starts
 func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
