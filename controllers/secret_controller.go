@@ -48,11 +48,11 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// your logic here
 	var secret corev1.Secret
 	if err := r.Get(ctx, req.NamespacedName, &secret); err != nil {
-		log.Error(err, "unable to get secrets", "secrets:", secret)
+		log.Error(err, "unable to get secrets", "secret", secret)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if err := r.patchSecret(secret); err != nil {
+	if _, err := r.patchSecret(secret); err != nil {
 		log.Error(err, "unable to patch secret with new value", "secret", secret)
 	}
 
@@ -101,12 +101,16 @@ func (r *SecretReconciler) secretGenerator(s corev1.Secret) (corev1.Secret, map[
 	return filtered, value, err
 }
 
-func (r *SecretReconciler) patchSecret(s corev1.Secret) error {
+func (r *SecretReconciler) patchSecret(s corev1.Secret) (corev1.Secret, error) {
+	ctx := context.TODO()
 	secretToPatch, newSecretVal, err := r.secretGenerator(s)
 
 	//patch logic to be generated for patching the object
+	patch := client.MergeFrom(s.DeepCopy())
+	s.Data = newSecretVal
+	r.Patch(ctx, &secretToPatch, patch)
 
-	return err
+	return secretToPatch, err
 }
 
 func (r *SecretReconciler) generateRandomBytes(n int) (map[string][]byte, error) {
@@ -119,7 +123,7 @@ func (r *SecretReconciler) generateRandomBytes(n int) (map[string][]byte, error)
 
 	//logic to map []byte to map[string][]byte
 	value := make(map[string][]byte, 1)
-	value["data"] = b
+	value["secret"] = b
 
 	return value, err
 }
