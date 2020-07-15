@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -37,6 +36,10 @@ type SecretReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+const (
+	namespaces = "default"
+)
+
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets/status,verbs=get;update;patch
 
@@ -47,18 +50,20 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	//TODO: a check is needed here for the type of secret being reconciled
 
-	// your logic here
 	//TODO
 	//A switch statement is needed here to account the different secret types, which will determine
 	//which functions are executed by 'case' ("generic", "tls", "docker-registry").
+
 	var secret corev1.Secret
 	if err := r.Get(ctx, req.NamespacedName, &secret); err != nil {
 		log.Error(err, "unable to get secrets", "secret", secret)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if _, err := r.patchSecret(secret); err != nil {
-		log.Error(err, "unable to patch secret with new value", "secret", secret)
+	patched, err := r.patchSecret(secret)
+	if err != nil {
+		log.Error(err, "unable to patch secret with new value", "secret", patched)
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -68,33 +73,35 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 // compareTime is a function that evaluates whether a secret is more than 7 days old
 // in such cases the secret that is more than 7 days old is returned to be used with secretGenerator
 func (r *SecretReconciler) compareTime(secrets corev1.Secret) (secret corev1.Secret, notValid bool, err error) {
-	secretTime := secrets.CreationTimestamp.Time
+
+	// Will not work if the value is CreationTimestamp.Time, which returns null, more logic needed to make
+	// everything UTC
+	secretTime := secrets.CreationTimestamp
 	targetTime := time.Now().AddDate(0, 0, -7)
 
-	isNotValid := secretTime.Before(targetTime)
+	isNotValid := secretTime.UTC().Before(targetTime)
 	//if isNotValid {
 	//	return corev1.Secret{}, fmt.Errorf("Secret has expired: %v. Triggering new secret generation", corev1.Secret{})
 	//}
 	return secret, isNotValid, err
 }
 
-func (r *SecretReconciler) filterSecret(secret corev1.Secret) corev1.Secret {
+func (r *SecretReconciler) filterSecret(secret corev1.Secret) (corev1.Secret, error) {
 	secret, notValid, err := r.compareTime(secret)
 	if err != nil {
-		fmt.Printf("error comparing the creation timestamp with target time for secret: %v", secret)
+		log.Errorf("error comparing the creation timestamp with target time for secret: %v", secret)
 	}
 
 	if notValid {
-		return corev1.Secret{}
+		log.Info("expired secret identified")
 	}
-	fmt.Println("expired secret identified")
-	return secret
+	return secret, err
 }
 
 // secretGenerator is a function that will eventually take an int (which is the length of the secret to be generated)
 // This will then be used within patchSecret
 func (r *SecretReconciler) secretGenerator(s corev1.Secret) (corev1.Secret, map[string][]byte, error) {
-	filtered := r.filterSecret(s)
+	filtered, err := r.filterSecret(s)
 
 	//logic for generating a random string which is used as the secret value
 	value, err := r.generateRandomBytes(20)
@@ -102,7 +109,6 @@ func (r *SecretReconciler) secretGenerator(s corev1.Secret) (corev1.Secret, map[
 		log.Errorf("Error creating new secret value for secret: %v", filtered)
 	}
 
-	log.Info("new secret value has been generated for expired secret")
 	return filtered, value, err
 }
 
@@ -128,7 +134,7 @@ func (r *SecretReconciler) generateRandomBytes(n int) (map[string][]byte, error)
 
 	//TODO
 	//logic to map []byte to map[string][]byte, but need to find a way of merging the patch such
-	//that it retains the value of the 'key'. "secret" is obviously not the original value
+	//that it retains the value of the string 'key'. "secret" is obviously not the original value
 	value := make(map[string][]byte, 1)
 	value[""] = b
 
@@ -136,6 +142,8 @@ func (r *SecretReconciler) generateRandomBytes(n int) (map[string][]byte, error)
 }
 
 //Functions needed to handle other secret types, other than generic as above.
+
+//TODO: account for StringData as well
 
 // SetupWithManager registers the controller with that manager so that it starts when the manager starts
 func (r *SecretReconciler) SetupWithManager(mgr ctrl.Manager) error {
