@@ -11,10 +11,12 @@ I'm working on this as and when I have some free time, but I aim to keep adding 
 
 Current state of affairs;
 
-[x] Managed to get some of the logic to take an individual secret which matches certain labels/namespaces/type
+- [x] Managed to get some of the logic to take an individual secret which matches certain labels/namespaces/type
+- [x] Generates an arbitrary value of a predetermined length of bytes (to be changed to getting the length of the current slice of bytes)
+- [x] I realised that the complexity of a controller takes a lot of consideration of how you deal with different types of the given GVK and it's specs
+- [x] This controller was a beginner one to familiarise myself with the libraries, and I am thinking of new controller examples to blog post on!
 
-[x] Generates an arbitrary value of a predetermined length of bytes (to be changed to getting the length of the current slice of bytes)
+TODO;
 
-[x] I realised that the complexity of a controller takes a lot of consideration of how you deal with different types of the given GVK and it's specs
-
-[x] This controller was a beginner one to familiarise myself with the libraries, and I am thinking of new controller examples to blog post on!
+- [ ] Publish some research on reversing one of the controllers in the core kubernetes repo
+- [ ] Start working on another controller or rewrite the first one above to be better (without making assumption in the way I've coded it)
