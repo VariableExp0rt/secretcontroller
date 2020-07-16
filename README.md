@@ -12,7 +12,8 @@ I'm working on this as and when I have some free time, but I aim to keep adding 
 Current state of affairs;
 
 - [x] Managed to get some of the logic to take an individual secret which matches certain labels/namespaces/type
-- [x] Generates an arbitrary value of a predetermined length of bytes (to be changed to getting the length of the current slice of bytes)
+- [x] Generates an arbitrary value of a predetermined length of bytes (to be changed to getting the length of the current slice of byte)
+- [x] Patch the secret with the newly generated slice of byte while preserving the key
 - [x] I realised that the complexity of a controller takes a lot of consideration of how you deal with different types of the given GVK and it's specs
 - [x] This controller was a beginner one to familiarise myself with the libraries, and I am thinking of new controller examples to blog post on!
 
@@ -20,3 +21,4 @@ TODO;
 
 - [ ] Publish some research on reversing one of the controllers in the core kubernetes repo
 - [ ] Start working on another controller or rewrite the first one above to be better (without making assumption in the way I've coded it)
+- [ ] Given that secrets can hold any kind of data, even things that might traditionally reside in a configmap, I need to limit myself to implementing certain functionality before the scope gets out of control. This might have been easier with TLS secrets, in hindsight!
