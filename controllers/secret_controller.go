@@ -39,7 +39,7 @@ type SecretReconciler struct {
 
 const (
 	namespaces                   = "default"
-	secretType corev1.SecretType = "generic"
+	secretType corev1.SecretType = "kubernetes.io/generic"
 )
 
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -62,7 +62,7 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if secret.Type == secretType || secret.Namespace == namespaces {
+	if secret.Type == secretType && secret.Namespace == namespaces {
 		log.Info("secret of type 'generic' identified", "secret", secret, "type", secretType)
 	}
 
@@ -91,7 +91,7 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 func (r *SecretReconciler) compareTime(secrets corev1.Secret) (corev1.Secret, bool, error) {
 
 	// Will not work if the value is CreationTimestamp.Time, which returns null, more logic needed to make
-	// everything UTC
+	// everything UTC - works with straight UTC time though https://play.golang.org/p/vLi6bGIBj7d
 
 	secretTime := secrets.CreationTimestamp
 	targetTime := time.Now().AddDate(0, 0, -7)
@@ -159,8 +159,6 @@ func (r *SecretReconciler) generateRandomBytes(oldval map[string][]byte) (map[st
 		oldval[key] = b
 		newval = oldval
 	}
-	// find a way to take the old value and preserve the "string" key and use ReplaceAll() for the
-	// byte slice
 
 	//TODO
 	//logic to map []byte to map[string][]byte, but need to find a way of merging the patch such
