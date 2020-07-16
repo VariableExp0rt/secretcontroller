@@ -151,7 +151,6 @@ func (r *SecretReconciler) generateRandomBytes(oldval map[string][]byte) (map[st
 
 		oldval[key] = b
 		newval = oldval
-		return newval, err
 	}
 	// find a way to take the old value and preserve the "string" key and use ReplaceAll() for the
 	// byte slice
