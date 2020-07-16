@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -61,8 +62,15 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if secret.Type == secretType && secret.Namespace == namespaces {
+	if secret.Type == secretType || secret.Namespace == namespaces {
 		log.Info("secret of type 'generic' identified", "secret", secret, "type", secretType)
+	}
+
+	// filter on the secrets with the labels where we know data is of a certain format -
+	// for instance, we know that the secrets I've created are string, but more complex controllers
+	// might store reconcile/manage certs that are stored in secrets
+	if secret.Labels["somelabel"] == "mysupersecret" {
+		return ctrl.Result{}, nil
 	}
 
 	patched, err := r.patchSecret(secret)
@@ -80,18 +88,17 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 // compareTime is a function that evaluates whether a secret is more than 7 days old
 // in such cases the secret that is more than 7 days old is returned to be used with secretGenerator
-func (r *SecretReconciler) compareTime(secrets corev1.Secret) (secret corev1.Secret, notValid bool, err error) {
+func (r *SecretReconciler) compareTime(secrets corev1.Secret) (corev1.Secret, bool, error) {
 
 	// Will not work if the value is CreationTimestamp.Time, which returns null, more logic needed to make
 	// everything UTC
+
 	secretTime := secrets.CreationTimestamp
 	targetTime := time.Now().AddDate(0, 0, -7)
 
-	isNotValid := secretTime.UTC().Before(targetTime)
-	//if isNotValid {
-	//	return corev1.Secret{}, fmt.Errorf("Secret has expired: %v. Triggering new secret generation", corev1.Secret{})
-	//}
-	return secret, isNotValid, err
+	notValid := secretTime.UTC().Before(targetTime)
+
+	return secrets, notValid, fmt.Errorf("cannot compare target time (%v) to secret time (%v)", targetTime, secretTime)
 }
 
 func (r *SecretReconciler) filterSecret(secret corev1.Secret) (corev1.Secret, error) {
