@@ -37,7 +37,8 @@ type SecretReconciler struct {
 }
 
 const (
-	namespaces = "default"
+	namespaces                   = "default"
+	secretType corev1.SecretType = "generic"
 )
 
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -60,13 +61,20 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if secret.Type == secretType && secret.Namespace == namespaces {
+		log.Info("secret of type 'generic' identified", "secret", secret, "type", secretType)
+	}
+
 	patched, err := r.patchSecret(secret)
 	if err != nil {
 		log.Error(err, "unable to patch secret with new value", "secret", patched)
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{
+		Requeue:      false,
+		RequeueAfter: 0,
+	}, nil
 
 }
 
@@ -102,9 +110,15 @@ func (r *SecretReconciler) filterSecret(secret corev1.Secret) (corev1.Secret, er
 // This will then be used within patchSecret
 func (r *SecretReconciler) secretGenerator(s corev1.Secret) (corev1.Secret, map[string][]byte, error) {
 	filtered, err := r.filterSecret(s)
+	if err != nil {
+		log.Error("error filtering secrets by time")
+	}
 
 	//logic for generating a random string which is used as the secret value
-	value, err := r.generateRandomBytes(20)
+	// first get the old data to be passed to the generateRandomBytes function
+	old := s.Data
+
+	value, err := r.generateRandomBytes(old)
 	if err != nil {
 		log.Errorf("Error creating new secret value for secret: %v", filtered)
 	}
@@ -124,21 +138,28 @@ func (r *SecretReconciler) patchSecret(s corev1.Secret) (corev1.Secret, error) {
 	return secretToPatch, err
 }
 
-func (r *SecretReconciler) generateRandomBytes(n int) (map[string][]byte, error) {
+func (r *SecretReconciler) generateRandomBytes(oldval map[string][]byte) (map[string][]byte, error) {
 
-	b := make([]byte, n)
-	_, err := rand.Read(b)
-	if err != nil {
-		return nil, err
+	var newval map[string][]byte
+	for key := range oldval {
+		n := 20
+		b := make([]byte, n)
+		_, err := rand.Read(b)
+		if err != nil {
+			log.Error("unable to generate new value for secret data")
+		}
+
+		oldval[key] = b
+		newval = oldval
+		return newval, err
 	}
+	// find a way to take the old value and preserve the "string" key and use ReplaceAll() for the
+	// byte slice
 
 	//TODO
 	//logic to map []byte to map[string][]byte, but need to find a way of merging the patch such
 	//that it retains the value of the string 'key'. "secret" is obviously not the original value
-	value := make(map[string][]byte, 1)
-	value[""] = b
-
-	return value, err
+	return newval, nil
 }
 
 //Functions needed to handle other secret types, other than generic as above.
