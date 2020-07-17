@@ -39,7 +39,7 @@ type SecretReconciler struct {
 
 const (
 	namespaces                   = "default"
-	secretType corev1.SecretType = "kubernetes.io/generic"
+	secretType corev1.SecretType = "Opaque"
 )
 
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -62,10 +62,8 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if secret.Type == secretType && secret.Namespace == namespaces {
-		log.Info("secret of type 'generic' identified", "secret", secret, "type", secretType)
-	}
-
+	_, notValid := r.compareTime(secret)
+	fmt.Printf("%v-%T\t", notValid, notValid)
 	// filter on the secrets with the labels where we know data is of a certain format -
 	// for instance, we know that the secrets I've created are string, but more complex controllers
 	// might store reconcile/manage certs that are stored in secrets
@@ -88,27 +86,27 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 // compareTime is a function that evaluates whether a secret is more than 7 days old
 // in such cases the secret that is more than 7 days old is returned to be used with secretGenerator
-func (r *SecretReconciler) compareTime(secrets corev1.Secret) (corev1.Secret, bool, error) {
+func (r *SecretReconciler) compareTime(s corev1.Secret) (corev1.Secret, float64) {
 
 	// Will not work if the value is CreationTimestamp.Time, which returns null, more logic needed to make
 	// everything UTC - works with straight UTC time though https://play.golang.org/p/vLi6bGIBj7d
 
-	secretTime := secrets.CreationTimestamp
-	targetTime := time.Now().AddDate(0, 0, -7)
+	secretTime := s.CreationTimestamp.Time
+	targetTime := time.Since(secretTime)
 
-	notValid := secretTime.UTC().Before(targetTime)
+	notValid := targetTime.Hours()
 
-	return secrets, notValid, fmt.Errorf("cannot compare target time (%v) to secret time (%v)", targetTime, secretTime)
+	return s, notValid
 }
 
 func (r *SecretReconciler) filterSecret(secret corev1.Secret) (corev1.Secret, error) {
-	secret, notValid, err := r.compareTime(secret)
-	if err != nil {
-		log.Errorf("error comparing the creation timestamp with target time for secret: %v", secret)
-	}
+	secret, notValid := r.compareTime(secret)
+	var err error
 
-	if notValid {
+	if notValid >= 168 {
 		log.Info("expired secret identified")
+	} else if notValid < 168 {
+		err = fmt.Errorf("ignoring secret because it has not expired: %v", secret.Name)
 	}
 	return secret, err
 }
@@ -118,7 +116,7 @@ func (r *SecretReconciler) filterSecret(secret corev1.Secret) (corev1.Secret, er
 func (r *SecretReconciler) secretGenerator(s corev1.Secret) (corev1.Secret, map[string][]byte, error) {
 	filtered, err := r.filterSecret(s)
 	if err != nil {
-		log.Error("error filtering secrets by time")
+		log.Infof("Skipped: %v", err)
 	}
 
 	//logic for generating a random string which is used as the secret value
@@ -156,6 +154,9 @@ func (r *SecretReconciler) generateRandomBytes(oldval map[string][]byte) (map[st
 			log.Error("unable to generate new value for secret data")
 		}
 
+		// Preserve the key, but assign new value to []byte and make newvalue the oldvalue
+		// return the newvalue and use that in the patchSecret function to make the change
+		// after deep copying the object
 		oldval[key] = b
 		newval = oldval
 	}
