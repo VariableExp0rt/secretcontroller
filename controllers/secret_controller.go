@@ -149,8 +149,8 @@ func (r *SecretReconciler) patchSecret(s corev1.Secret) (corev1.Secret, error) {
 func (r *SecretReconciler) generateRandomBytes(oldval map[string][]byte) (map[string][]byte, error) {
 
 	var newval map[string][]byte
-	for key := range oldval {
-		n := 20
+	for key, val := range oldval {
+		n := len(val)
 		b := make([]byte, n)
 		_, err := rand.Read(b)
 		if err != nil {
