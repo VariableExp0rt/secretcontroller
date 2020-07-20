@@ -103,9 +103,9 @@ func (r *SecretReconciler) filterSecret(secret corev1.Secret) (corev1.Secret, er
 	secret, notValid := r.compareTime(secret)
 	var err error
 
-	if notValid >= 168 {
+	if int(notValid) >= 168 {
 		log.Info("expired secret identified")
-	} else if notValid < 168 {
+	} else if int(notValid) < 168 {
 		err = fmt.Errorf("ignoring secret because it has not expired: %v", secret.Name)
 	}
 	return secret, err
@@ -136,9 +136,12 @@ func (r *SecretReconciler) patchSecret(s corev1.Secret) (corev1.Secret, error) {
 	secretToPatch, newSecretVal, err := r.secretGenerator(s)
 
 	//patch logic to be generated for patching the object
-	patch := client.MergeFrom(s.DeepCopy())
-	s.Data = newSecretVal
-	r.Patch(ctx, &secretToPatch, patch)
+	patch := s.DeepCopy()
+	patch.Data = newSecretVal
+	r.Patch(ctx, &secretToPatch, client.MergeFrom(patch))
+	if err != nil {
+		log.Errorf("unable to complete patch operation for secret", "secret", secretToPatch)
+	}
 
 	return secretToPatch, err
 }
