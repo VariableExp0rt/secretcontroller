@@ -40,6 +40,7 @@ type SecretReconciler struct {
 const (
 	namespaces                   = "default"
 	secretType corev1.SecretType = "Opaque"
+	myLabel                      = "mysupersecret"
 )
 
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -62,14 +63,15 @@ func (r *SecretReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if secret.Labels["secret-type"] == myLabel {
+		log.Info("secret with appropriate label identified", "secret", secret)
+	}
+
 	_, notValid := r.compareTime(secret)
 	fmt.Printf("%v-%T\t", notValid, notValid)
 	// filter on the secrets with the labels where we know data is of a certain format -
 	// for instance, we know that the secrets I've created are string, but more complex controllers
 	// might store reconcile/manage certs that are stored in secrets
-	if secret.Labels["somelabel"] == "mysupersecret" {
-		return ctrl.Result{}, nil
-	}
 
 	patched, err := r.patchSecret(secret)
 	if err != nil {
